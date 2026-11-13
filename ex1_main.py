@@ -17,7 +17,8 @@ def parse_args():
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--seed', type=int, default=1, help='random seed (default: 1)')
     parser.add_argument('--log-interval', type=int, default=10, help='how many batches to wait before logging training status')
-    parser.add_argument('--save-model', action='store_true', default=False, help='For Saving the current Model')
+    parser.add_argument('--save-model', action='store_true', default=False,
+                        help='accepted for compatibility; the best model is always saved')
     parser.add_argument('--dry-run', action='store_true', default=False, help='quickly check a single pass')
     return parser.parse_args()
 
@@ -59,6 +60,9 @@ def test(model, device, test_loader, criterion, set="Test"):
 
 
 def run(args):
+    if args.epochs < 1:
+        raise ValueError('--epochs must be at least 1')
+
     # Keep downloads beside this script, regardless of the working directory.
     data_dir = Path(__file__).resolve().parent / 'data' / 'cifar10'
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -124,10 +128,22 @@ def run(args):
     model.to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
+    checkpoint_dir = Path(__file__).resolve().parent / 'checkpoints'
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_path = checkpoint_dir / f'{args.model}_best.pt'
+    best_val_accuracy = -1.0
+
     for epoch in range(1, args.epochs + 1):
         train(model, trainloader, optimizer, criterion, device, epoch)
         val_accuracy = test(model, device, valloader, criterion, set="Validation")
+        if val_accuracy > best_val_accuracy:
+            best_val_accuracy = val_accuracy
+            torch.save(model.state_dict(), checkpoint_path)
+            print(f'Saved best model: {best_val_accuracy:.2%} validation accuracy '
+                  f'(epoch {epoch}) to {checkpoint_path}')
 
+    # Evaluate the weights selected by validation accuracy, not the final epoch.
+    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
     test(model, device, testloader, criterion)
 
 if __name__ == '__main__':
