@@ -50,10 +50,12 @@ def test(model, device, test_loader, criterion, set="Test"):
             correct += pred.eq(target.view_as(pred)).sum().item()
 
     test_loss /= len(test_loader.dataset)
+    accuracy = correct / len(test_loader.dataset)
 
     print('\n{} set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         set, test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+        100. * accuracy))
+    return accuracy
 
 
 def run(args):
@@ -124,7 +126,7 @@ def run(args):
 
     for epoch in range(1, args.epochs + 1):
         train(model, trainloader, optimizer, criterion, device, epoch)
-        test(model, device, valloader, criterion, set="Validation")
+        val_accuracy = test(model, device, valloader, criterion, set="Validation")
 
     test(model, device, testloader, criterion)
 
