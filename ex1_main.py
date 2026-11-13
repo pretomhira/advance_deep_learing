@@ -6,8 +6,6 @@ from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 from torch import optim
 
-from my_models import ViT, CrossViT   # rename the skeleton file for your implementation / comment before testing for ResNet
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a neural network to classify CIFAR10')
@@ -93,12 +91,18 @@ def run(args):
     # Build a feed-forward network
     print(f"Using {args.model}")
     if args.model == "r18":
-        model = models.resnet18(pretrained=False)
+        # Start from random weights and predict the 10 CIFAR10 classes.
+        model = models.resnet18(weights=None)
+        model.fc = nn.Linear(model.fc.in_features, 10)
     elif args.model == "vit":
+        from my_models import ViT
+
         model = ViT(image_size = 32, patch_size = 8, num_classes = 10, dim = 64,
                     depth = 2, heads = 8, mlp_dim = 128, dropout = 0.1,
                     emb_dropout = 0.1) 
     elif args.model == "cvit":
+        from my_models import CrossViT
+
         model = CrossViT(image_size = 32, num_classes = 10, sm_dim = 64, 
                          lg_dim = 128, sm_patch_size = 8, sm_enc_depth = 2,
                          sm_enc_heads = 8, sm_enc_mlp_dim = 128, 
