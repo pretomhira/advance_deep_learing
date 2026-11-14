@@ -41,17 +41,21 @@ class FeedForward(nn.Module):
 class Attention(nn.Module):
     def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
         super().__init__()
-        # set heads and scale (=sqrt(dim_head))
-        # TODO
-        # we need softmax layer and dropout
-        # TODO
-        # as well as the q linear layer
-        # TODO
-        # and the k/v linear layer (can be realized as one single linear layer
-        # or as two individual ones)
-        # TODO
-        # and the output linear layer followed by dropout
-        # TODO
+        self.heads = heads
+        inner_dim = heads * dim_head
+        # Dividing by sqrt(dim_head) keeps attention scores from growing too large.
+        self.scale = dim_head ** -0.5
+        self.attend = nn.Softmax(dim=-1)
+        self.dropout = nn.Dropout(dropout)
+
+        # Each token produces a query (what it needs), a key (what it matches),
+        # and a value (the information it can contribute).
+        self.to_q = nn.Linear(dim, inner_dim, bias=False)
+        self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
+        self.to_out = nn.Sequential(
+            nn.Linear(inner_dim, dim),
+            nn.Dropout(dropout),
+        )
 
     def forward(self, x, context = None, kv_include_self = False):
         # now compute the attention/cross-attention
@@ -67,7 +71,24 @@ class Attention(nn.Module):
             # cross attention requires CLS token includes itself as key / value
             context = torch.cat((x, context), dim = 1) 
         
-        # TODO: attention 
+        q = self.to_q(x)
+        k, v = self.to_kv(context).chunk(2, dim=-1)
+
+        # Separate heads: [batch, tokens, heads * dim_head]
+        # becomes [batch, heads, tokens, dim_head].
+        q, k, v = map(
+            lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h),
+            (q, k, v),
+        )
+
+        # Compare each query with every key, then turn scores into weights.
+        scores = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
+        attention = self.dropout(self.attend(scores))
+
+        # Mix values using those weights and combine the attention heads.
+        out = einsum('b h i j, b h j d -> b h i d', attention, v)
+        out = rearrange(out, 'b h n d -> b n (h d)')
+        out = self.to_out(out)
 
         return out 
 
