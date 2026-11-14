@@ -198,12 +198,25 @@ class MultiScaleEncoder(nn.Module):
         self.layers = nn.ModuleList([])
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
-                # 2 transformer branches, one for small, one for large patchs
-                # + 1 cross transformer block
+                Transformer(dim=sm_dim, dropout=dropout, **sm_enc_params),
+                Transformer(dim=lg_dim, dropout=dropout, **lg_enc_params),
+                CrossTransformer(
+                    sm_dim=sm_dim,
+                    lg_dim=lg_dim,
+                    depth=cross_attn_depth,
+                    heads=cross_attn_heads,
+                    dim_head=cross_attn_dim_head,
+                    dropout=dropout,
+                ),
             ]))
 
     def forward(self, sm_tokens, lg_tokens):
-        # forward through the transformer encoders and cross attention block
+        for sm_encoder, lg_encoder, cross_encoder in self.layers:
+            # First learn relationships within each branch independently.
+            sm_tokens = sm_encoder(sm_tokens)
+            lg_tokens = lg_encoder(lg_tokens)
+            # Then exchange information between the two scales.
+            sm_tokens, lg_tokens = cross_encoder(sm_tokens, lg_tokens)
         return sm_tokens, lg_tokens
 
 # CrossViT (could actually also be used in ViT)
