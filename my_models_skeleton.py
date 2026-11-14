@@ -352,7 +352,12 @@ class CrossViT(nn.Module):
     ):
         super().__init__()
         # create ImageEmbedder for small and large patches
-        # TODO
+        self.sm_image_embedder = ImageEmbedder(
+            dim=sm_dim, image_size=image_size,
+            patch_size=sm_patch_size, dropout=emb_dropout)
+        self.lg_image_embedder = ImageEmbedder(
+            dim=lg_dim, image_size=image_size,
+            patch_size=lg_patch_size, dropout=emb_dropout)
 
         # create MultiScaleEncoder
         self.multi_scale_encoder = MultiScaleEncoder(
@@ -383,13 +388,15 @@ class CrossViT(nn.Module):
 
     def forward(self, img):
         # apply image embedders
-        # TODO
+        sm_tokens = self.sm_image_embedder(img)
+        lg_tokens = self.lg_image_embedder(img)
 
         # and the multi-scale encoder
-        # TODO
+        sm_tokens, lg_tokens = self.multi_scale_encoder(sm_tokens, lg_tokens)
 
         # call the mlp heads w. the class tokens 
-        # TODO
+        sm_logits = self.sm_mlp_head(sm_tokens[:, 0])
+        lg_logits = self.lg_mlp_head(lg_tokens[:, 0])
         
         return sm_logits + lg_logits
 
