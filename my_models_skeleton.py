@@ -138,7 +138,9 @@ class ProjectInOut(nn.Module):
             - after calling fn, the tensor has to be projected back into it's original shape   
             - fn(W_in) * W_out
         """
-        # TODO
+        x = self.project_in(x)
+        x = self.fn(x, *args, **kwargs)
+        x = self.project_out(x)
         return x
 
 # CrossViT
