@@ -101,13 +101,13 @@ def run(args):
         model = models.resnet18(weights=None)
         model.fc = nn.Linear(model.fc.in_features, 10)
     elif args.model == "vit":
-        from my_models import ViT
+        from my_models_skeleton import ViT
 
         model = ViT(image_size = 32, patch_size = 8, num_classes = 10, dim = 64,
                     depth = 2, heads = 8, mlp_dim = 128, dropout = 0.1,
                     emb_dropout = 0.1) 
     elif args.model == "cvit":
-        from my_models import CrossViT
+        from my_models_skeleton import CrossViT
 
         model = CrossViT(image_size = 32, num_classes = 10, sm_dim = 64, 
                          lg_dim = 128, sm_patch_size = 8, sm_enc_depth = 2,
