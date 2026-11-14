@@ -150,19 +150,32 @@ class CrossTransformer(nn.Module):
     def __init__(self, sm_dim, lg_dim, depth, heads, dim_head, dropout):
         super().__init__()
         self.layers = nn.ModuleList([])
-        # TODO: create # depth encoders using ProjectInOut
-        # Note: no positional FFN here 
+        # Each layer exchanges information in both directions. There is no FFN.
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                # Small class token reads large patch embeddings.
+                ProjectInOut(sm_dim, lg_dim, PreNorm(
+                    lg_dim, Attention(lg_dim, heads=heads,
+                                      dim_head=dim_head, dropout=dropout))),
+                # Large class token reads small patch embeddings.
+                ProjectInOut(lg_dim, sm_dim, PreNorm(
+                    sm_dim, Attention(sm_dim, heads=heads,
+                                      dim_head=dim_head, dropout=dropout))),
+            ]))
 
     def forward(self, sm_tokens, lg_tokens):
         (sm_cls, sm_patch_tokens), (lg_cls, lg_patch_tokens) = map(lambda t: (t[:, :1], t[:, 1:]), (sm_tokens, lg_tokens))
 
-        # Forward pass through the layers, 
-        # cross attend to 
-        # 1. small cls token to large patches and
-        # 2. large cls token to small patches
-        # TODO
-        # finally concat sm/lg cls tokens with patch tokens 
-        # TODO
+        for sm_attend_lg, lg_attend_sm in self.layers:
+            # Include the projected class token itself among the keys/values.
+            sm_cls = sm_cls + sm_attend_lg(
+                sm_cls, context=lg_patch_tokens, kv_include_self=True)
+            lg_cls = lg_cls + lg_attend_sm(
+                lg_cls, context=sm_patch_tokens, kv_include_self=True)
+
+        # Only class tokens change here; preserve each branch's patch tokens.
+        sm_tokens = torch.cat((sm_cls, sm_patch_tokens), dim=1)
+        lg_tokens = torch.cat((lg_cls, lg_patch_tokens), dim=1)
         return sm_tokens, lg_tokens
 
 # CrossViT
